@@ -1,3 +1,15 @@
+# Full pipeline, not build:app. `build` runs, in order: check:env, build:db
+# (prisma generate + the bundled client at @/generated/prisma/client),
+# check:db (migrations against DIRECT_DATABASE_URL), tracker, recorder,
+# geo, openapi, build:packages (@umami/api-client and @umami/mcp workspace
+# packages that src/app/mcp/route.ts imports), then build:app. Running
+# build:app alone fails on the generated client and the two packages.
+# This block overrides the UI build command. Added for scribish-analytics;
+# everything below is upstream.
+[build]
+command = "pnpm run build"
+publish = ".next"
+
 [functions]
 included_files = ["node_modules/.geo/**"]
 
