@@ -30,6 +30,21 @@ function error(msg) {
   console.log(chalk.redBright(`✗ ${msg}`));
 }
 
+// scribish-analytics: a TCP-level failure from node-postgres (every resolved
+// address refused or unreachable) is an AggregateError whose message is an
+// empty string, which printed as a bare "✗" and hid the real cause. Print
+// the name, code, cause and each underlying error so the build log says
+// what actually happened.
+function describe(e) {
+  const parts = [e?.message || `${e?.name || 'Error'} with no message`];
+  if (e?.code) parts.push(`code=${e.code}`);
+  if (e?.cause) parts.push(`cause=${e.cause.message || e.cause}`);
+  if (Array.isArray(e?.errors) && e.errors.length) {
+    parts.push('underlying: ' + e.errors.map(x => `${x.code || x.name}: ${x.message}`).join('; '));
+  }
+  return parts.join(' | ');
+}
+
 async function checkEnv() {
   if (!process.env.DATABASE_URL) {
     throw new Error('DATABASE_URL is not defined.');
@@ -53,7 +68,13 @@ async function checkConnection() {
 }
 
 async function checkDatabaseVersion() {
-  const query = await prisma.$queryRaw`select current_setting('server_version_num') as version_num`;
+  // Runs against DATABASE_URL (the runtime connection), not DIRECT_DATABASE_URL.
+  let query;
+  try {
+    query = await prisma.$queryRaw`select current_setting('server_version_num') as version_num`;
+  } catch (e) {
+    throw new Error(`Version query on DATABASE_URL (${url.host}) failed: ${describe(e)}`);
+  }
   const version = Number(query[0]?.version_num);
 
   if (!Number.isFinite(version)) {
@@ -88,7 +109,7 @@ async function applyMigration() {
     try {
       await fn();
     } catch (e) {
-      error(e.message);
+      error(describe(e));
       err = true;
     } finally {
       if (err) {
