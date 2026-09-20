@@ -12,6 +12,11 @@ publish = ".next"
 
 [functions]
 included_files = ["node_modules/.geo/**"]
+# scribish-analytics: a cold start (new instance + Prisma + a fresh pooler
+# connection) was measured at 12.2s on /api/auth/login. Netlify's default
+# synchronous timeout is 10s, so a cold-start pageview on /api/send could be
+# dropped. 26s is Netlify's configurable maximum.
+timeout = 26
 
 [[plugins]]
 package = "@netlify/plugin-nextjs"
